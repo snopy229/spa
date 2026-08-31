@@ -45,8 +45,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    "daphne",
     'django.contrib.staticfiles',
-]
+    'channels',
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
