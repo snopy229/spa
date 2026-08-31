@@ -12,8 +12,11 @@ services:
       - .env
     volumes:
       - ./backend:/app
+      - static:/app/static
+      - media:/app/media
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     build:
@@ -22,13 +25,18 @@ services:
     command: make frontend-run
     container_name: frontend-run
     restart: always
-    volumes:
-      - ./frontend:/app
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - WATCHPACK_POLLING=true
 
   db:
     image: postgres:16-alpine
+    container_name: spa_db
+    restart: always
     env_file:
       - .env
     environment:
@@ -37,6 +45,11 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
