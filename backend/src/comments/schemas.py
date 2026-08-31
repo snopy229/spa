@@ -9,3 +9,12 @@ class CommentCreateIn(Schema):
     avatar: str
     created_at: datetime
     email: EmailStr | None = None
+
+
+class CommentTreeOut(Schema):
+    id: int
+    username: str
+    avatar: str
+    created_at: datetime
+    email: EmailStr | None = None
+    replies: list["CommentTreeOut"] = []  # noqa: RUF012
