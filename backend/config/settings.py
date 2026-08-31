@@ -16,9 +16,8 @@ from pathlib import Path
 
 from environ import Env
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 env = Env(DEBUG=(bool, False))
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(os.path.join(BASE_DIR, "src"))
 
@@ -48,6 +47,7 @@ INSTALLED_APPS = [
     "daphne",
     'django.contrib.staticfiles',
     'channels',
+    'src.comments'
 ]
 
 MIDDLEWARE = [

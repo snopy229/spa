@@ -1,12 +1,11 @@
-FROM node:26-slim
+FROM node:26-alpine
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libjpeg-dev \
+RUN apk add --no-cache \
+    libjpeg-turbo-dev \
     libpng-dev \
-    make \
-    && rm -rf /var/lib/apt/lists/*
+    make
 
 COPY . .
 
