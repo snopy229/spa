@@ -1,4 +1,4 @@
-exclude: '^/migrations/|src/core/static|config/'
+exclude: '^/migrations/|src/core/static|config/|\.html$|\.svg$'
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -36,12 +36,3 @@ repos:
     hooks:
       - id: django-upgrade
         args: ["--target-version", "5.1"]
-
-
-  - repo: https://github.com/Riverside-Healthcare/djLint
-    rev: v1.35.2
-    hooks:
-      - id: djlint-reformat-django
-        exclude: "wagtail|templates/"
-      - id: djlint-django
-        exclude: "wagtail|templates/"
