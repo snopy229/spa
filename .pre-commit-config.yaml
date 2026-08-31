@@ -1,7 +1,7 @@
-exclude: '^/migrations/|src/core/static|config/|\.html$|\.svg$'
+exclude: '^/migrations/|src/core/static|config/|\.html$'
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -9,30 +9,28 @@ repos:
       - id: check-toml
       - id: check-json
       - id: check-added-large-files
-        args: ["--maxkb=1000"]
+        args: ['--maxkb=1000']
       - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: debug-statements
       - id: detect-private-key
-      - id: mixed-line-ending
-        args: ["--fix=lf"]
+      - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.16.5
     hooks:
       - id: ruff
-        args: [ "--fix" ]
-        exclude: "migrations/"
+        args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.10
-    hooks:
-      - id: bandit
-        exclude: "migrations/|tests/"
-
   - repo: https://github.com/adamchainz/django-upgrade
-    rev: 1.21.0
+    rev: 1.32.0
     hooks:
       - id: django-upgrade
-        args: ["--target-version", "5.1"]
+        args: [--target-version, "5.0"]
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml", "-r", "."]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^tests/

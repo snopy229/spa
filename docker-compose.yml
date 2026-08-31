@@ -1,9 +1,9 @@
 services:
-  web:
+  backend:
     build:
-      context: .
+      context: backend
       dockerfile: Dockerfile
-    command: make run
+    command: make backend-run
     container_name: spa_web
     restart: always
     ports:
@@ -11,11 +11,22 @@ services:
     env_file:
       - .env
     volumes:
-      - .:/app
-      - static:/app/static
-      - media:/app/media
+      - ./backend:/app
     depends_on:
       - db
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    command: make frontend-run
+    container_name: frontend-run
+    restart: always
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+
   db:
     image: postgres:16-alpine
     env_file:
