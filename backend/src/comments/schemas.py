@@ -30,6 +30,16 @@ class CommentCreateIn(Schema):
 
         return file
 
+    @field_validator("avatar")
+    @classmethod
+    def validate_avatar(cls, avatar: UploadedFile | None):
+        if avatar is None:
+            return avatar
+        if avatar.content_type not in ["image/jpeg", "image/gif", "image/png"]:
+            raise ValueError("Разрешены только файлы формата JPG, GIF и PNG.")
+
+        return avatar
+
 
 class CommentTreeOut(Schema):
     id: int
