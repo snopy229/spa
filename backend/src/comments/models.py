@@ -18,7 +18,7 @@ class Comments(models.Model):
         blank=True,
         null=True,
     )
-    comment_id = models.ForeignKey(
+    comment = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies"
     )
 
