@@ -1,4 +1,4 @@
-exclude: '^/migrations/|src/core/static|config/|\.html$'
+exclude: '(^|/)migrations/|src/core/static|config/|\.html$'
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
