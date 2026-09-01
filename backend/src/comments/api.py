@@ -1,3 +1,5 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from ninja import File, Form, Router, UploadedFile
 from src.comments.models import Comments
 from src.comments.schemas import CommentCreateIn, CommentTreeOut
@@ -47,7 +49,18 @@ def post_comment(
         text=payload.text,
         avatar=avatar,
         file=file,
-        comment_id_id=parent_id,
+        comment_id=parent_id,
+    )
+
+    serialized_comment = CommentTreeOut.model_validate(comment).model_dump(mode="json")
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "comments",
+        {
+            "type": "new_comment",
+            "comment": serialized_comment,
+        },
     )
 
     return comment
