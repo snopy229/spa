@@ -46,8 +46,10 @@ INSTALLED_APPS = [
     'daphne',
     'django.contrib.staticfiles',
     'channels',
+    'corsheaders',
+    'django_ninja',
     'src.comments',
-    'corsheaders'
+    
 ]
 
 MIDDLEWARE = [
