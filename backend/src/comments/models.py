@@ -1,6 +1,10 @@
 # Create your models here.
-from django.core.validators import FileExtensionValidator
+import logging
+
 from django.db import models
+from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 class Comments(models.Model):
@@ -10,14 +14,22 @@ class Comments(models.Model):
     text = models.TextField()
     email = models.EmailField(null=True, blank=True)
     file = models.FileField(
-        upload_to="documents/",
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=["txt", "jpg", "gif", "png"],
-                message="Разрешены только файлы формата TXT, JPG, GIF и PNG.",
-            )
-        ],
+        upload_to="file/",
+        blank=True,
+        null=True,
     )
     comment_id = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies"
     )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.file or self.avatar:
+            try:
+                with Image.open(self.file.path) as img:
+                    if img.width > 320 or img.height > 240:
+                        img.thumbnail((320, 240))
+                        img.save(self.file.path)
+            except Exception:
+                logger.exception("Error occurred while processing image")
