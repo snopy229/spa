@@ -2,10 +2,12 @@ from ninja import File, Form, Router, UploadedFile
 from ninja.pagination import PageNumberPagination, paginate
 from src.comments.container import comments_service
 from src.comments.exceptions import (
+    EmptyCommentTextException,
+    EmptyUsernameException,
     FileTooLargeException,
+    HTMLTagsNotClosedException,
     InvalidCommentTextException,
     InvalidFileTypeException,
-    InvalidHTMLTagsException,
     InvalidUsernameException,
     exception_responses,
 )
@@ -26,9 +28,11 @@ def get_comments(request, order_by: SORT_OPTIONS = "-created_at"):
     openapi_extra=exception_responses(
         FileTooLargeException,
         InvalidFileTypeException,
+        EmptyUsernameException,
         InvalidUsernameException,
+        EmptyCommentTextException,
         InvalidCommentTextException,
-        InvalidHTMLTagsException,
+        HTMLTagsNotClosedException,
     ),
 )
 def post_comment(
