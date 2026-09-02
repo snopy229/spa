@@ -1,18 +1,20 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from ninja import File, Form, Router, UploadedFile
+from ninja.pagination import PageNumberPagination, paginate
 from src.comments.models import Comments
-from src.comments.schemas import CommentCreateIn, CommentTreeOut
+from src.comments.schemas import SORT_OPTIONS, CommentCreateIn, CommentTreeOut
 
 router = Router()
 
 
 @router.get("/comments", response=list[CommentTreeOut])
-def get_comments(request):
+@paginate(PageNumberPagination, page_size=25)
+def get_comments(request, order_by: SORT_OPTIONS = "-created_at"):
     comments = (
         Comments.objects.filter(comment_id__isnull=True)
         .prefetch_related("replies")
-        .order_by("-created_at")
+        .order_by(order_by)
     )
 
     return comments
@@ -22,9 +24,9 @@ def get_comments(request):
 def post_comment(
     request,
     payload: Form[CommentCreateIn],
-    file: File[UploadedFile] = None,  # type: ignore
-    avatar: File[UploadedFile] = None,
-):  # type: ignore
+    file: File[UploadedFile] | None = None,  # type: ignore
+    avatar: File[UploadedFile] | None = None,  # type: ignore
+):
 
     if file and file.content_type not in [
         "text/plain",
@@ -33,7 +35,7 @@ def post_comment(
         "image/png",
     ]:
         raise ValueError("Разрешены только файлы формата TXT, JPG, GIF и PNG.")
-    if file.content_type == "text/plain" and file.size > 100 * 1024:
+    if file and file.content_type == "text/plain" and file.size > 100 * 1024:
         raise ValueError("Размер файла TXT не должен превышать 100 KB.")
 
     if avatar and avatar.content_type not in ["image/jpeg", "image/gif", "image/png"]:
@@ -55,7 +57,7 @@ def post_comment(
     serialized_comment = CommentTreeOut.model_validate(comment).model_dump(mode="json")
 
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
+    async_to_sync(channel_layer.group_send)(  # type: ignore
         "comments",
         {
             "type": "new_comment",
