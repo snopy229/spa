@@ -1,8 +1,14 @@
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from ninja import File, Form, Router, UploadedFile
 from ninja.pagination import PageNumberPagination, paginate
-from src.comments.models import Comments
+from src.comments.container import comments_service
+from src.comments.exceptions import (
+    FileTooLargeException,
+    InvalidCommentTextException,
+    InvalidFileTypeException,
+    InvalidHTMLTagsException,
+    InvalidUsernameException,
+    exception_responses,
+)
 from src.comments.schemas import SORT_OPTIONS, CommentCreateIn, CommentTreeOut
 
 router = Router()
@@ -11,58 +17,24 @@ router = Router()
 @router.get("/comments", response=list[CommentTreeOut])
 @paginate(PageNumberPagination, page_size=25)
 def get_comments(request, order_by: SORT_OPTIONS = "-created_at"):
-    comments = (
-        Comments.objects.filter(comment_id__isnull=True)
-        .prefetch_related("replies")
-        .order_by(order_by)
-    )
-
-    return comments
+    return comments_service.list_comments(order_by=order_by)
 
 
-@router.post("/comments", response=CommentTreeOut)
+@router.post(
+    "/comments",
+    response=CommentTreeOut,
+    openapi_extra=exception_responses(
+        FileTooLargeException,
+        InvalidFileTypeException,
+        InvalidUsernameException,
+        InvalidCommentTextException,
+        InvalidHTMLTagsException,
+    ),
+)
 def post_comment(
     request,
     payload: Form[CommentCreateIn],
     file: File[UploadedFile] | None = None,  # type: ignore
     avatar: File[UploadedFile] | None = None,  # type: ignore
 ):
-
-    if file and file.content_type not in [
-        "text/plain",
-        "image/jpeg",
-        "image/gif",
-        "image/png",
-    ]:
-        raise ValueError("Разрешены только файлы формата TXT, JPG, GIF и PNG.")
-    if file and file.content_type == "text/plain" and file.size > 100 * 1024:
-        raise ValueError("Размер файла TXT не должен превышать 100 KB.")
-
-    if avatar and avatar.content_type not in ["image/jpeg", "image/gif", "image/png"]:
-        raise ValueError("Разрешены только файлы формата JPG, GIF и PNG.")
-
-    parent_id = (
-        payload.comment_id if payload.comment_id and payload.comment_id > 0 else None
-    )
-
-    comment = Comments.objects.create(
-        username=payload.username,
-        email=payload.email,
-        text=payload.text,
-        avatar=avatar,
-        file=file,
-        comment_id=parent_id,
-    )
-
-    serialized_comment = CommentTreeOut.model_validate(comment).model_dump(mode="json")
-
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(  # type: ignore
-        "comments",
-        {
-            "type": "new_comment",
-            "comment": serialized_comment,
-        },
-    )
-
-    return comment
+    return comments_service.create_comment(payload, file, avatar)
