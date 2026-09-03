@@ -42,7 +42,4 @@ def post_comment(
     file: File[UploadedFile] = None,
     avatar: File[UploadedFile] = None,
 ):
-    print("request.FILES:", request.FILES)
-    print("avatar param:", avatar)
-    print("payload:", payload)
     return comments_service.create_comment(payload, file, avatar)

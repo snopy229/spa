@@ -27,9 +27,70 @@ function getMediaUrl(path) {
   return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-function CommentItem({ comment, isRoot = false, onReply }) {
+function isImageFile(path) {
+  if (!path) return false;
+  return /\.(jpe?g|png|gif|webp)$/i.test(path.split('?')[0]);
+}
+
+function sortComments(list, orderBy) {
+  const isDesc = orderBy.startsWith("-");
+  const field = isDesc ? orderBy.slice(1) : orderBy;
+
+  return [...list].sort((a, b) => {
+    let valA = a[field] ?? "";
+    let valB = b[field] ?? "";
+
+    if (field === "created_at") {
+      valA = new Date(valA).getTime();
+      valB = new Date(valB).getTime();
+    } else if (typeof valA === "string") {
+      return isDesc
+        ? valB.localeCompare(valA)
+        : valA.localeCompare(valB);
+    }
+
+    return isDesc ? (valB > valA ? 1 : -1) : (valA > valB ? 1 : -1);
+  });
+}
+
+function addCommentToTree(list, newComment, orderBy, page) {
+  if (!newComment.comment_id) {
+    if (page !== 1) {
+      return list;
+    }
+    const updated = [...list, newComment];
+    return sortComments(updated, orderBy);
+  }
+
+  let parentFound = false;
+
+  function insertReply(items) {
+    return items.map((item) => {
+      if (item.id === newComment.comment_id) {
+        parentFound = true;
+        return {
+          ...item,
+          replies: [...(item.replies || []), newComment],
+        };
+      }
+      if (item.replies && item.replies.length > 0) {
+        return {
+          ...item,
+          replies: insertReply(item.replies),
+        };
+      }
+      return item;
+    });
+  }
+
+  const updatedTree = insertReply(list);
+  return parentFound ? updatedTree : list;
+}
+
+function CommentItem({ comment, isRoot = false, onReply, onImageClick }) {
   const avatarUrl = getMediaUrl(comment.avatar);
   const fileUrl = getMediaUrl(comment.file);
+  const isFileImage = isImageFile(comment.file);
 
   return (
     <div className={`comment ${isRoot ? 'comment-root' : ''}`}>
@@ -53,20 +114,29 @@ function CommentItem({ comment, isRoot = false, onReply }) {
         </div>
 
         <p
-  className="comment-text"
-  dangerouslySetInnerHTML={{ __html: comment.text }}
-/>
+          className="comment-text"
+          dangerouslySetInnerHTML={{ __html: comment.text }}
+        />
 
         {fileUrl && (
           <div className="comment-attachment" style={{ marginTop: 8 }}>
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
-            >
-              📎 {comment.file.split('/').pop()}
-            </a>
+            {isFileImage ? (
+              <img
+                src={fileUrl}
+                alt="Вложение"
+                className="comment-attachment-img"
+                onClick={() => onImageClick(fileUrl)}
+              />
+            ) : (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
+              >
+                📎 {comment.file.split('/').pop()}
+              </a>
+            )}
           </div>
         )}
 
@@ -86,6 +156,7 @@ function CommentItem({ comment, isRoot = false, onReply }) {
                 comment={reply}
                 isRoot={false}
                 onReply={onReply}
+                onImageClick={onImageClick}
               />
             ))}
           </div>
@@ -102,6 +173,7 @@ function App() {
   const [orderBy, setOrderBy] = useState("-created_at");
   const [page, setPage] = useState(1);
   const [replyTarget, setReplyTarget] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -115,6 +187,30 @@ function App() {
         setError("Не удалось загрузить комментарии");
       })
       .finally(() => setLoading(false));
+  }, [orderBy, page]);
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8080/ws/comments');
+
+    ws.onmessage = (event) => {
+      try {
+        const newComment = JSON.parse(event.data);
+        if (!newComment.replies) {
+          newComment.replies = [];
+        }
+        setComments((prevComments) => addCommentToTree(prevComments, newComment, orderBy, page));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error('WS Error:', err);
+    };
+
+    return () => {
+      ws.close();
+    };
   }, [orderBy, page]);
 
   return (
@@ -167,6 +263,7 @@ function App() {
                 comment={comment}
                 isRoot={true}
                 onReply={(target) => setReplyTarget(target)}
+                onImageClick={(url) => setSelectedImage(url)}
               />
             ))}
           </div>
@@ -256,6 +353,14 @@ function App() {
           </form>
         </div>
       </div>
+
+      {selectedImage && (
+        <div className="lightbox-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="lightbox-content">
+            <img src={selectedImage} alt="Увеличенное изображение" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
