@@ -1,4 +1,5 @@
-from ninja import File, Form, Router, UploadedFile
+from ninja import File, Form, Router
+from ninja.files import UploadedFile
 from ninja.pagination import PageNumberPagination, paginate
 from src.comments.container import comments_service
 from src.comments.exceptions import (
@@ -38,7 +39,10 @@ def get_comments(request, order_by: SORT_OPTIONS = "-created_at"):
 def post_comment(
     request,
     payload: Form[CommentCreateIn],
-    file: File[UploadedFile] | None = None,  # type: ignore
-    avatar: File[UploadedFile] | None = None,  # type: ignore
+    file: File[UploadedFile] = None,
+    avatar: File[UploadedFile] = None,
 ):
+    print("request.FILES:", request.FILES)
+    print("avatar param:", avatar)
+    print("payload:", payload)
     return comments_service.create_comment(payload, file, avatar)
