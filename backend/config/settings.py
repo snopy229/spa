@@ -21,7 +21,7 @@ env = Env(DEBUG=(bool, False))
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(os.path.join(BASE_DIR, "src"))
 
-Env.read_env(os.path.join(BASE_DIR, ".env"))
+Env.read_env(os.path.join(BASE_DIR, ".env.example"))
 
 
 # Quick-start development settings - unsuitable for production
@@ -161,5 +161,4 @@ MAILERS = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "http://172.18.0.4:5173",
 ]
