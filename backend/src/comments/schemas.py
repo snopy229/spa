@@ -5,8 +5,10 @@ from typing import Literal
 import bleach
 from defusedxml import ElementTree
 from defusedxml.ElementTree import ParseError
+from django.utils.text import normalize_newlines
 from ninja import Schema
 from pydantic import EmailStr, field_validator
+
 from src.comments.exceptions import (
     HTMLTagsNotClosedException,
     InvalidCommentTextException,
@@ -41,11 +43,11 @@ class CommentCreateIn(Schema):
         except ParseError:
             raise HTMLTagsNotClosedException
 
-        if (
+        if normalize_newlines(
             bleach.clean(value, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES)
-            != value
-        ):
+        ) != normalize_newlines(value):
             raise InvalidCommentTextException
+
         return value
 
 
