@@ -57,22 +57,10 @@ class InvalidFileTypeException(DefaultHTTPException):
     )
 
 
-class EmptyUsernameException(DefaultHTTPException):
-    status_code = 422
-    error = "EMPTY_USERNAME"
-    message = "The username cannot be empty"
-
-
 class InvalidUsernameException(DefaultHTTPException):
     status_code = 422
     error = "INVALID_USERNAME"
     message = "The username can only contain Latin letters and numbers"
-
-
-class EmptyCommentTextException(DefaultHTTPException):
-    status_code = 422
-    error = "EMPTY_COMMENT_TEXT"
-    message = "The comment text cannot be empty. Only the following tags are allowed: <a>, <code>, <i>, <strong>"
 
 
 class InvalidCommentTextException(DefaultHTTPException):

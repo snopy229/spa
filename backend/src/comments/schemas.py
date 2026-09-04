@@ -8,8 +8,6 @@ from defusedxml.ElementTree import ParseError
 from ninja import Schema
 from pydantic import EmailStr, field_validator
 from src.comments.exceptions import (
-    EmptyCommentTextException,
-    EmptyUsernameException,
     HTMLTagsNotClosedException,
     InvalidCommentTextException,
     InvalidUsernameException,
@@ -26,22 +24,18 @@ ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
 class CommentCreateIn(Schema):
     username: str
     text: str
+    home_page: str | None = None
     comment_id: int | None = None
     email: EmailStr | None = None
 
     @field_validator("username")
     def validate_username(cls, value: str) -> str:
-        if not value.strip():
-            raise EmptyUsernameException
         if not USERNAME_REGEX.match(value):
             raise InvalidUsernameException
         return value
 
     @field_validator("text")
     def validate_text(cls, value: str) -> str:
-        if not value.strip():
-            raise EmptyCommentTextException
-
         try:
             ElementTree.fromstring(f"<root>{value}</root>")
         except ParseError:
@@ -63,5 +57,6 @@ class CommentTreeOut(Schema):
     text: str
     created_at: datetime
     email: EmailStr | None = None
+    home_page: str | None = None
     comment_id: int | None = None
     replies: list["CommentTreeOut"] = []  # noqa: RUF012
