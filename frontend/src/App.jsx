@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import './App.css';
 
 const API_BASE = 'http://localhost:8080';
@@ -175,6 +175,92 @@ function App() {
   const [replyTarget, setReplyTarget] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
 
+  const [messageText, setMessageText] = useState("");
+  const textareaRef = useRef(null);
+
+  const [captchaText, setCaptchaText] = useState("");
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaError, setCaptchaError] = useState(false);
+  const canvasRef = useRef(null);
+
+  const insertTag = (openTag, closeTag) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = messageText.substring(start, end);
+
+    const replacement = `${openTag}${selectedText}${closeTag}`;
+    const newText = messageText.substring(0, start) + replacement + messageText.substring(end);
+
+    setMessageText(newText);
+
+    setTimeout(() => {
+      textarea.focus();
+      if (selectedText.length > 0) {
+        textarea.setSelectionRange(start + openTag.length, end + openTag.length);
+      } else {
+        const cursorPosition = start + openTag.length;
+        textarea.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }, 0);
+  };
+
+  const generateCaptcha = () => {
+    const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+    let code = "";
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setCaptchaText(code);
+    setCaptchaInput("");
+    setCaptchaError(false);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#F6F7F4";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < 4; i++) {
+      ctx.strokeStyle = ["#F2A93B", "#D6D9D1", "#767C82"][Math.floor(Math.random() * 3)];
+      ctx.lineWidth = 1 + Math.random();
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 30; i++) {
+      ctx.fillStyle = "#A8ADB2";
+      ctx.beginPath();
+      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (let i = 0; i < code.length; i++) {
+      ctx.save();
+      ctx.font = `bold ${20 + Math.floor(Math.random() * 4)}px 'JetBrains Mono', monospace`;
+      ctx.fillStyle = "#15181D";
+
+      const x = 16 + i * 20;
+      const y = 28 + Math.floor(Math.random() * 6) - 3;
+      const angle = (Math.random() - 0.5) * 0.4;
+
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillText(code[i], 0, 0);
+      ctx.restore();
+    }
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     fetchComments(orderBy, page)
@@ -212,6 +298,18 @@ function App() {
       ws.close();
     };
   }, [orderBy, page]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (captchaInput.trim().toLowerCase() !== captchaText.toLowerCase()) {
+      setCaptchaError(true);
+      generateCaptcha();
+      return;
+    }
+
+    setCaptchaError(false);
+  };
 
   return (
     <div className="wrap">
@@ -293,7 +391,7 @@ function App() {
             </div>
           </div>
 
-          <form className="composer-body" onSubmit={(e) => e.preventDefault()}>
+          <form className="composer-body" onSubmit={handleSubmit}>
             {replyTarget && (
               <div className="reply-banner">
                 <span>Ответ пользователю <b>{replyTarget.username}</b></span>
@@ -318,8 +416,8 @@ function App() {
                 <input id="user-name" type="text" placeholder="latin_letters123" required />
               </div>
               <div className="field">
-                <label htmlFor="user-email">E-mail *</label>
-                <input id="user-email" type="email" placeholder="mail@example.com" required />
+                <label htmlFor="user-email">E-mail</label>
+                <input id="user-email" type="email" placeholder="mail@example.com" />
               </div>
               <div className="field full">
                 <label htmlFor="user-homepage">Home page</label>
@@ -328,14 +426,44 @@ function App() {
             </div>
 
             <div className="toolbar">
-              <button type="button" className="tool-btn"><i>i</i></button>
-              <button type="button" className="tool-btn"><b>B</b></button>
-              <button type="button" className="tool-btn mono">&lt;/&gt;</button>
-              <button type="button" className="tool-btn">🔗</button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => insertTag('<i>', '</i>')}
+              >
+                &lt;i&gt;
+              </button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => insertTag('<strong>', '</strong>')}
+              >
+                &lt;strong&gt;
+              </button>
+              <button
+                type="button"
+                className="tool-btn mono"
+                onClick={() => insertTag('<code>', '</code>')}
+              >
+                &lt;code&gt;
+              </button>
+              <button
+                type="button"
+                className="tool-btn"
+                onClick={() => insertTag('<a href="" title="">', '</a>')}
+              >
+                &lt;a&gt;
+              </button>
               <span className="allowed-tags">&lt;a&gt; &lt;code&gt; &lt;i&gt; &lt;strong&gt;</span>
             </div>
 
-            <textarea className="message" placeholder="Введите текст комментария…"></textarea>
+            <textarea
+              ref={textareaRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              className="message"
+              placeholder="Введите текст комментария…"
+            />
 
             <label className="dropzone">
               <input type="file" accept=".jpg,.png,.gif,.txt" hidden />
@@ -344,10 +472,40 @@ function App() {
             </label>
 
             <div className="captcha-row">
-              <div className="captcha-img mono">K7 xQ2</div>
-              <button type="button" className="captcha-refresh">↻</button>
-              <input type="text" placeholder="Код с картинки" required />
+              <canvas
+                ref={canvasRef}
+                width={120}
+                height={44}
+                className="captcha-img"
+                onClick={generateCaptcha}
+                style={{ cursor: 'pointer', padding: 0 }}
+                title="Нажмите, чтобы обновить"
+              />
+              <button
+                type="button"
+                className="captcha-refresh"
+                onClick={generateCaptcha}
+                title="Обновить код"
+              >
+                ↻
+              </button>
+              <input
+                type="text"
+                placeholder="Код с картинки"
+                value={captchaInput}
+                onChange={(e) => {
+                  setCaptchaInput(e.target.value);
+                  if (captchaError) setCaptchaError(false);
+                }}
+                style={captchaError ? { borderColor: '#ef4444', outlineColor: '#ef4444' } : {}}
+                required
+              />
             </div>
+            {captchaError && (
+              <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                Неверный код с картинки
+              </span>
+            )}
 
             <button type="submit" className="submit-btn">➤ Отправить комментарий</button>
           </form>
