@@ -178,10 +178,78 @@ function App() {
   const [messageText, setMessageText] = useState("");
   const textareaRef = useRef(null);
 
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState(null);
+  const [txtFileSnippet, setTxtFileSnippet] = useState("");
+  const fileInputRef = useRef(null);
+
   const [captchaText, setCaptchaText] = useState("");
   const [captchaInput, setCaptchaInput] = useState("");
   const [captchaError, setCaptchaError] = useState(false);
   const canvasRef = useRef(null);
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleAttachmentChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (attachmentPreview) {
+      URL.revokeObjectURL(attachmentPreview);
+    }
+
+    setAttachmentFile(file);
+
+    if (file.type.startsWith('image/')) {
+      setAttachmentPreview(URL.createObjectURL(file));
+      setTxtFileSnippet("");
+    } else if (file.type === "text/plain" || file.name.toLowerCase().endsWith('.txt')) {
+      setAttachmentPreview(null);
+      // Считываем первые строки для предпросмотра
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setTxtFileSnippet(event.target.result || "");
+      };
+      reader.readAsText(file.slice(0, 1000));
+    } else {
+      setAttachmentPreview(null);
+      setTxtFileSnippet("");
+    }
+  };
+
+  const removeAttachment = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (attachmentPreview) {
+      URL.revokeObjectURL(attachmentPreview);
+    }
+    setAttachmentFile(null);
+    setAttachmentPreview(null);
+    setTxtFileSnippet("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+    };
+  }, [avatarPreview, attachmentPreview]);
 
   const insertTag = (openTag, closeTag) => {
     const textarea = textareaRef.current;
@@ -403,10 +471,27 @@ function App() {
               <div className="field full avatar-picker-field">
                 <label>Аватар</label>
                 <div className="avatar-picker">
-                  <div className="avatar avatar-preview" style={{ backgroundColor: '#F2A93B' }}>?</div>
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Предпросмотр аватара"
+                      className="avatar avatar-preview"
+                      style={{ objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div className="avatar avatar-preview" style={{ backgroundColor: '#F2A93B' }}>
+                      ?
+                    </div>
+                  )}
                   <label htmlFor="user-avatar" className="avatar-upload-btn">
                     Выбрать изображение
-                    <input id="user-avatar" type="file" accept="image/png,image/jpeg,image/gif" hidden />
+                    <input
+                      id="user-avatar"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif"
+                      onChange={handleAvatarChange}
+                      hidden
+                    />
                   </label>
                 </div>
               </div>
@@ -465,11 +550,112 @@ function App() {
               placeholder="Введите текст комментария…"
             />
 
-            <label className="dropzone">
-              <input type="file" accept=".jpg,.png,.gif,.txt" hidden />
-              📎 Перетащите файл или нажмите для выбора
-              <span className="formats">JPG · PNG · GIF · TXT</span>
-            </label>
+            <div className="attachment-box" style={{ marginTop: 8, marginBottom: 12 }}>
+              <input
+                id="file-attachment"
+                ref={fileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.gif,.txt"
+                onChange={handleAttachmentChange}
+                hidden
+              />
+
+              {!attachmentFile ? (
+                <label htmlFor="file-attachment" className="dropzone" style={{ cursor: 'pointer', display: 'block' }}>
+                  📎 Перетащите файл или нажмите для выбора
+                  <span className="formats">JPG · PNG · GIF · TXT</span>
+                </label>
+              ) : (
+                <div
+                  className="attachment-preview-card"
+                  style={{
+                    backgroundColor: '#F6F7F4',
+                    borderRadius: 8,
+                    border: '1px solid #D6D9D1',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '8px 12px'
+                    }}
+                  >
+                    {attachmentPreview ? (
+                      <img
+                        src={attachmentPreview}
+                        alt="Превью"
+                        style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4 }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          backgroundColor: '#EAECE7',
+                          borderRadius: 4,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #D6D9D1'
+                        }}
+                      >
+                        <span style={{ fontSize: 18, lineHeight: 1 }}>📄</span>
+                        <span style={{ fontSize: 8, fontWeight: 700, color: '#767C82', marginTop: 2 }}>TXT</span>
+                      </div>
+                    )}
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#15181D' }}>
+                        {attachmentFile.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#767C82' }}>
+                        {(attachmentFile.size / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={removeAttachment}
+                      title="Удалить файл"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 18,
+                        color: '#767C82',
+                        padding: '4px 8px'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {txtFileSnippet && (
+                    <div
+                      style={{
+                        borderTop: '1px dashed #D6D9D1',
+                        padding: '8px 12px',
+                        backgroundColor: '#FFFFFF',
+                        fontSize: 12,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color: '#494D52',
+                        maxHeight: 90,
+                        overflowY: 'auto',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all'
+                      }}
+                    >
+                      {txtFileSnippet}
+                      {attachmentFile.size > 1000 && <span style={{ color: '#A8ADB2', display: 'block', marginTop: 4 }}>... [показано начало файла]</span>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="captcha-row">
               <canvas
