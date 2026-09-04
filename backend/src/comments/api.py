@@ -1,6 +1,7 @@
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.pagination import PageNumberPagination, paginate
+
 from src.comments.container import comments_service
 from src.comments.exceptions import (
     FileTooLargeException,
@@ -8,9 +9,9 @@ from src.comments.exceptions import (
     InvalidCommentTextException,
     InvalidFileTypeException,
     InvalidUsernameException,
-    exception_responses,
 )
 from src.comments.schemas import SORT_OPTIONS, CommentCreateIn, CommentTreeOut
+from src.default_exceptions import exception_responses
 
 router = Router()
 
