@@ -26,7 +26,7 @@ class CommentCreateIn(Schema):
     text: str
     home_page: str | None = None
     comment_id: int | None = None
-    email: EmailStr | None = None
+    email: EmailStr
 
     @field_validator("username")
     def validate_username(cls, value: str) -> str:
@@ -56,7 +56,7 @@ class CommentTreeOut(Schema):
     file: str | None = None
     text: str
     created_at: datetime
-    email: EmailStr | None = None
+    email: EmailStr
     home_page: str | None = None
     comment_id: int | None = None
     replies: list["CommentTreeOut"] = []  # noqa: RUF012

@@ -35,6 +35,11 @@ function isImageFile(path) {
   return /\.(jpe?g|png|gif|webp)$/i.test(path.split('?')[0]);
 }
 
+function isTextFile(path) {
+  if (!path) return false;
+  return /\.txt$/i.test(path.split('?')[0]);
+}
+
 function sortComments(list, orderBy) {
   const isDesc = orderBy.startsWith("-");
   const field = isDesc ? orderBy.slice(1) : orderBy;
@@ -104,12 +109,98 @@ function addCommentToTree(list, newComment, orderBy, page) {
   return parentFound ? updatedTree : list;
 }
 
-function CommentItem({ comment, isRoot = false, onReply, onImageClick }) {
+function InlineTextSnippet({ url, fileName }) {
+  const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error("Ошибка сети");
+        return res.text();
+      })
+      .then((text) => {
+        if (isMounted) {
+          setContent(text);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setContent("Не удалось загрузить содержимое файла");
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [url]);
+
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        background: '#F9FAFB',
+        border: '1px solid var(--line-strong)',
+        borderRadius: 6,
+        padding: '6px 10px',
+        maxWidth: '480px'
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          fontSize: 11,
+          color: 'var(--muted)',
+          borderBottom: '1px solid var(--line)',
+          paddingBottom: 4,
+          marginBottom: 6
+        }}
+      >
+        <a
+          href={url}
+          download
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: 'var(--accent-ink)', textDecoration: 'none', fontWeight: 600 }}
+        >
+          Скачать ⤓
+        </a>
+      </div>
+
+      {loading ? (
+        <span style={{ fontSize: 11, color: 'var(--faint)' }}>Чтение содержимого...</span>
+      ) : (
+        <pre
+          style={{
+            margin: 0,
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+            color: '#374151',
+            maxHeight: 90,
+            overflowY: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all'
+          }}
+        >
+          {content}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function CommentRow({ comment, depth = 0, onReply, onImageClick }) {
   const avatarUrl = getMediaUrl(comment.avatar);
   const fileUrl = getMediaUrl(comment.file);
   const isFileImage = isImageFile(comment.file);
+  const isFileText = isTextFile(comment.file);
 
-  const rawHomepage = (comment.home_page || "").trim();
+  const rawHomepage = (comment.home_page || comment.homepage || "").trim();
   const homepageUrl = rawHomepage && rawHomepage !== "null"
     ? rawHomepage.startsWith('http://') || rawHomepage.startsWith('https://')
       ? rawHomepage
@@ -117,101 +208,127 @@ function CommentItem({ comment, isRoot = false, onReply, onImageClick }) {
     : null;
 
   return (
-    <div className={`comment ${isRoot ? 'comment-root' : ''}`}>
-      {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt={comment.username}
-          className="avatar"
-          style={{ objectFit: 'cover' }}
-        />
-      ) : (
-        <div className="avatar" style={{ backgroundColor: '#F2A93B' }}>
-          {comment.username.charAt(0).toUpperCase()}
-        </div>
-      )}
-
-      <div className="comment-body">
-        <div className="comment-meta" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          {homepageUrl ? (
-            <a
-              href={homepageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="comment-name"
-              title={`Перейти на сайт автора: ${homepageUrl}`}
-              style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}
-            >
-              {comment.username} ↗
-            </a>
-          ) : (
-            <span className="comment-name">{comment.username}</span>
-          )}
-
-          {comment.email && (
-            <a
-              href={`mailto:${comment.email}`}
-              className="comment-email"
-              title={`Написать на ${comment.email}`}
-              style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
-            >
-              ({comment.email})
-            </a>
-          )}
-
-          <span className="comment-date">{formatDate(comment.created_at)}</span>
-        </div>
-
-        <p
-          className="comment-text"
-          dangerouslySetInnerHTML={{ __html: comment.text }}
-        />
-
-        {fileUrl && (
-          <div className="comment-attachment" style={{ marginTop: 8 }}>
-            {isFileImage ? (
+    <>
+      <tr className={`comment-tr ${depth > 0 ? 'reply-row' : ''}`}>
+        <td style={{ paddingLeft: `${16 + depth * 24}px` }} className="col-user">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {depth > 0 && <span style={{ color: 'var(--muted)', fontSize: '13px' }}>↳</span>}
+            {avatarUrl ? (
               <img
-                src={fileUrl}
-                alt="Вложение"
-                className="comment-attachment-img"
-                onClick={() => onImageClick(fileUrl)}
+                src={avatarUrl}
+                alt={comment.username}
+                className="avatar"
+                style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
               />
             ) : (
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
+              <div
+                className="avatar"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  backgroundColor: '#F2A93B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: '#fff'
+                }}
               >
-                📎 {comment.file.split('/').pop()}
-              </a>
+                {comment.username.charAt(0).toUpperCase()}
+              </div>
             )}
+            <div>
+              {homepageUrl ? (
+                <a
+                  href={homepageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="comment-name"
+                  title={`Сайт: ${homepageUrl}`}
+                  style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}
+                >
+                  {comment.username} ↗
+                </a>
+              ) : (
+                <span className="comment-name" style={{ fontWeight: 'bold' }}>{comment.username}</span>
+              )}
+            </div>
           </div>
-        )}
+        </td>
 
-        <button
-          type="button"
-          className="reply-btn"
-          onClick={() => onReply(comment)}
-        >
-          ↩ Ответить
-        </button>
+        <td className="col-email">
+          {comment.email ? (
+            <a
+              href={`mailto:${comment.email}`}
+              style={{ fontSize: '13px', color: 'var(--muted)', textDecoration: 'none' }}
+            >
+              {comment.email}
+            </a>
+          ) : (
+            <span style={{ color: 'var(--muted)', fontSize: '12px' }}>—</span>
+          )}
+        </td>
 
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="replies">
-            {comment.replies.map((reply) => (
-              <CommentItem
-                key={reply.id}
-                comment={reply}
-                isRoot={false}
-                onReply={onReply}
-                onImageClick={onImageClick}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+        <td className="col-text">
+          <div
+            className="comment-text"
+            dangerouslySetInnerHTML={{ __html: comment.text }}
+          />
+
+          {fileUrl && (
+            <div className="comment-attachment" style={{ marginTop: 8 }}>
+              {isFileImage ? (
+                <img
+                  src={fileUrl}
+                  alt="Вложение"
+                  className="comment-attachment-img"
+                  style={{ maxHeight: 60, borderRadius: 4, cursor: 'pointer' }}
+                  onClick={() => onImageClick(fileUrl)}
+                />
+              ) : isFileText ? (
+                <InlineTextSnippet url={fileUrl} fileName={comment.file.split('/').pop()} />
+              ) : (
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none', display: 'inline-block' }}
+                >
+                  📎 {comment.file.split('/').pop()}
+                </a>
+              )}
+            </div>
+          )}
+        </td>
+
+        <td className="col-date" style={{ whiteSpace: 'nowrap', fontSize: '12px', color: 'var(--muted)' }}>
+          {formatDate(comment.created_at)}
+        </td>
+
+        <td className="col-actions" style={{ textAlign: 'right' }}>
+          <button
+            type="button"
+            className="reply-btn"
+            onClick={() => onReply(comment)}
+            style={{ padding: '4px 8px', fontSize: '12px' }}
+          >
+            ↩
+          </button>
+        </td>
+      </tr>
+
+      {comment.replies && comment.replies.length > 0 && comment.replies.map((reply) => (
+        <CommentRow
+          key={reply.id}
+          comment={reply}
+          depth={depth + 1}
+          onReply={onReply}
+          onImageClick={onImageClick}
+        />
+      ))}
+    </>
   );
 }
 
@@ -247,6 +364,16 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
+  const toggleSort = (field) => {
+    setOrderBy(prev => (prev === field ? `-${field}` : field));
+  };
+
+  const renderSortIndicator = (field) => {
+    if (orderBy === field) return ' ▴';
+    if (orderBy === `-${field}`) return ' ▾';
+    return ' ⇅';
+  };
+
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -281,7 +408,7 @@ function App() {
       reader.onerror = () => {
         setTxtFileSnippet("Не удалось прочитать содержимое текстового файла");
       };
-      reader.readAsText(file.slice(0, 1000));
+      reader.readAsText(file);
     } else {
       setAttachmentPreview(null);
       setTxtFileSnippet("");
@@ -557,58 +684,66 @@ function App() {
     <div className="wrap">
       <div className="layout">
         <div className="feed-column">
-          <div className="surface sort-bar">
-            <div className="sort-group">
-              <button
-                className={`sort-btn ${orderBy.includes('username') ? 'active' : ''}`}
-                onClick={() => setOrderBy(orderBy === 'username' ? '-username' : 'username')}
-              >
-                Имя {orderBy === '-username' ? '▾' : orderBy === 'username' ? '▴' : '⇅'}
-              </button>
-              <button
-                className={`sort-btn ${orderBy.includes('email') ? 'active' : ''}`}
-                onClick={() => setOrderBy(orderBy === 'email' ? '-email' : 'email')}
-              >
-                E-mail {orderBy === '-email' ? '▾' : orderBy === 'email' ? '▴' : '⇅'}
-              </button>
-              <button
-                className={`sort-btn ${orderBy.includes('created_at') ? 'active' : ''}`}
-                onClick={() => setOrderBy(orderBy === '-created_at' ? 'created_at' : '-created_at')}
-              >
-                Дата {orderBy === '-created_at' ? '▾' : orderBy === 'created_at' ? '▴' : '⇅'}
-              </button>
-            </div>
-          </div>
+          <div className="surface comments-table-container">
+            <table className="comments-table">
+              <thead>
+                <tr>
+                  <th onClick={() => toggleSort('username')} style={{ cursor: 'pointer' }}>
+                    User Name{renderSortIndicator('username')}
+                  </th>
+                  <th onClick={() => toggleSort('email')} style={{ cursor: 'pointer' }}>
+                    E-mail{renderSortIndicator('email')}
+                  </th>
+                  <th>Текст сообщения</th>
+                  <th onClick={() => toggleSort('created_at')} style={{ cursor: 'pointer' }}>
+                    Дата{renderSortIndicator('created_at')}
+                  </th>
+                  <th style={{ width: '40px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px' }}>
+                      Загрузка сообщений...
+                    </td>
+                  </tr>
+                )}
 
-          <div className="surface feed">
-            {loading && <p style={{ padding: 16 }}>Загрузка сообщений...</p>}
+                {error && (
+                  <tr>
+                    <td colSpan="5" style={{ color: '#ef4444', textAlign: 'center', padding: '16px' }}>
+                      ⚠️ {error}
+                      <button
+                        type="button"
+                        onClick={() => setPage(p => p)}
+                        style={{ marginLeft: 8, border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+                      >
+                        Повторить
+                      </button>
+                    </td>
+                  </tr>
+                )}
 
-            {error && (
-              <div style={{ padding: 16, color: '#ef4444', display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span>⚠️ {error}</span>
-                <button
-                  type="button"
-                  onClick={() => setPage(p => p)}
-                  style={{ border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
+                {!loading && !error && comments.length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>
+                      Комментариев пока нет
+                    </td>
+                  </tr>
+                )}
 
-            {!loading && !error && comments.length === 0 && (
-              <p style={{ padding: 16, color: 'var(--muted)' }}>Комментариев пока нет</p>
-            )}
-
-            {!loading && comments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                isRoot={true}
-                onReply={(target) => setReplyTarget(target)}
-                onImageClick={(url) => setSelectedImage(url)}
-              />
-            ))}
+                {!loading && !error && comments.map((comment) => (
+                  <CommentRow
+                    key={comment.id}
+                    comment={comment}
+                    depth={0}
+                    onReply={(target) => setReplyTarget(target)}
+                    onImageClick={(url) => setSelectedImage(url)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
 
           <div className="pagination">
@@ -630,10 +765,8 @@ function App() {
         </div>
 
         <div className="surface composer-column">
-          <div className="composer-tabs">
-            <div className="tabs-left">
-              <button className="tab active">✎ Написать</button>
-            </div>
+          <div className="composer-tabs" style={{ justifyContent: 'center' }}>
+            <button className="tab active" style={{ margin: '0 auto' }}>✎ Написать</button>
           </div>
 
           <form className="composer-body" onSubmit={handleSubmit}>
@@ -686,13 +819,14 @@ function App() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="user-email">E-mail</label>
+                <label htmlFor="user-email">E-mail *</label>
                 <input
                   id="user-email"
                   type="email"
                   placeholder="mail@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               <div className="field full">
@@ -837,18 +971,27 @@ function App() {
                       style={{
                         borderTop: '1px dashed #D6D9D1',
                         padding: '8px 12px',
-                        backgroundColor: '#FFFFFF',
-                        fontSize: 12,
-                        fontFamily: "'JetBrains Mono', monospace",
-                        color: '#494D52',
-                        maxHeight: 90,
-                        overflowY: 'auto',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-all'
+                        backgroundColor: '#FFFFFF'
                       }}
                     >
-                      {txtFileSnippet}
-                      {attachmentFile.size > 1000 && <span style={{ color: '#A8ADB2', display: 'block', marginTop: 4 }}>... [показано начало файла]</span>}
+                      <pre
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          color: '#374151',
+                          maxHeight: 120,
+                          overflowY: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          background: '#F9FAFB',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          border: '1px solid #E5E7EB'
+                        }}
+                      >
+                        {txtFileSnippet}
+                      </pre>
                     </div>
                   )}
                 </div>
