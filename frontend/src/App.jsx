@@ -6,7 +6,10 @@ const API_BASE = 'http://localhost:8080';
 async function fetchComments(orderBy = "-created_at", page = 1) {
   const params = new URLSearchParams({ order_by: orderBy, page });
   const res = await fetch(`${API_BASE}/api/comments?${params}`);
-  if (!res.ok) throw new Error("Failed to fetch comments");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || errorData?.message || `Ошибка загрузки комментариев: ${res.status}`);
+  }
   return res.json();
 }
 
@@ -54,6 +57,20 @@ function sortComments(list, orderBy) {
 }
 
 function addCommentToTree(list, newComment, orderBy, page) {
+  const exists = (items) => {
+    return items.some((item) => {
+      if (item.id === newComment.id) return true;
+      if (item.replies && item.replies.length > 0) {
+        return exists(item.replies);
+      }
+      return false;
+    });
+  };
+
+  if (exists(list)) {
+    return list;
+  }
+
   if (!newComment.comment_id) {
     if (page !== 1) {
       return list;
@@ -92,6 +109,13 @@ function CommentItem({ comment, isRoot = false, onReply, onImageClick }) {
   const fileUrl = getMediaUrl(comment.file);
   const isFileImage = isImageFile(comment.file);
 
+  const rawHomepage = (comment.home_page || "").trim();
+  const homepageUrl = rawHomepage && rawHomepage !== "null"
+    ? rawHomepage.startsWith('http://') || rawHomepage.startsWith('https://')
+      ? rawHomepage
+      : `https://${rawHomepage}`
+    : null;
+
   return (
     <div className={`comment ${isRoot ? 'comment-root' : ''}`}>
       {avatarUrl ? (
@@ -108,8 +132,33 @@ function CommentItem({ comment, isRoot = false, onReply, onImageClick }) {
       )}
 
       <div className="comment-body">
-        <div className="comment-meta">
-          <span className="comment-name">{comment.username}</span>
+        <div className="comment-meta" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          {homepageUrl ? (
+            <a
+              href={homepageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="comment-name"
+              title={`Перейти на сайт автора: ${homepageUrl}`}
+              style={{ textDecoration: 'underline', color: 'inherit', fontWeight: 'bold' }}
+            >
+              {comment.username} ↗
+            </a>
+          ) : (
+            <span className="comment-name">{comment.username}</span>
+          )}
+
+          {comment.email && (
+            <a
+              href={`mailto:${comment.email}`}
+              className="comment-email"
+              title={`Написать на ${comment.email}`}
+              style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none' }}
+            >
+              ({comment.email})
+            </a>
+          )}
+
           <span className="comment-date">{formatDate(comment.created_at)}</span>
         </div>
 
@@ -175,11 +224,15 @@ function App() {
   const [replyTarget, setReplyTarget] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
 
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [homepage, setHomepage] = useState("");
   const [messageText, setMessageText] = useState("");
   const textareaRef = useRef(null);
 
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarFile, setAvatarFile] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
@@ -190,6 +243,9 @@ function App() {
   const [captchaInput, setCaptchaInput] = useState("");
   const [captchaError, setCaptchaError] = useState(false);
   const canvasRef = useRef(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
@@ -218,10 +274,12 @@ function App() {
       setTxtFileSnippet("");
     } else if (file.type === "text/plain" || file.name.toLowerCase().endsWith('.txt')) {
       setAttachmentPreview(null);
-      // Считываем первые строки для предпросмотра
       const reader = new FileReader();
       reader.onload = (event) => {
         setTxtFileSnippet(event.target.result || "");
+      };
+      reader.onerror = () => {
+        setTxtFileSnippet("Не удалось прочитать содержимое текстового файла");
       };
       reader.readAsText(file.slice(0, 1000));
     } else {
@@ -231,8 +289,10 @@ function App() {
   };
 
   const removeAttachment = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (attachmentPreview) {
       URL.revokeObjectURL(attachmentPreview);
     }
@@ -242,6 +302,25 @@ function App() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const resetForm = () => {
+    setMessageText("");
+    setUsername("");
+    setEmail("");
+    setHomepage("");
+    if (replyTarget) setReplyTarget(null);
+
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+
+    removeAttachment();
+    setCaptchaInput("");
+    setCaptchaError(false);
+    setSubmitError(null);
+    generateCaptcha();
   };
 
   useEffect(() => {
@@ -337,58 +416,145 @@ function App() {
         setError(null);
       })
       .catch((err) => {
-        console.error(err);
-        setError("Не удалось загрузить комментарии");
+        console.error("Ошибка при загрузке комментариев:", err);
+        setError(err.message || "Не удалось загрузить комментарии");
       })
       .finally(() => setLoading(false));
   }, [orderBy, page]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080/ws/comments');
+    let ws;
+    try {
+      ws = new WebSocket('ws://localhost:8080/ws/comments');
 
-    ws.onmessage = (event) => {
-      try {
-        const newComment = JSON.parse(event.data);
-        if (!newComment.replies) {
-          newComment.replies = [];
+      ws.onmessage = (event) => {
+        try {
+          const newComment = JSON.parse(event.data);
+          if (!newComment.replies) {
+            newComment.replies = [];
+          }
+          setComments((prevComments) => addCommentToTree(prevComments, newComment, orderBy, page));
+        } catch (err) {
+          console.error("Ошибка парсинга WebSocket сообщения:", err);
         }
-        setComments((prevComments) => addCommentToTree(prevComments, newComment, orderBy, page));
-      } catch (err) {
-        console.error(err);
-      }
-    };
+      };
 
-    ws.onerror = (err) => {
-      console.error('WS Error:', err);
-    };
+      ws.onerror = (err) => {
+        console.warn('WS соединение недоступно или прервано:', err);
+      };
+    } catch (e) {
+      console.warn("Ошибка инициализации WebSocket:", e);
+    }
 
     return () => {
-      ws.close();
+      if (ws) ws.close();
     };
   }, [orderBy, page]);
 
-  const handleSubmit = (e) => {
+  const validateHTML = (text) => {
+    const allowed = ['i', 'strong', 'code', 'a'];
+    for (const tag of allowed) {
+      const openRegex = new RegExp(`<${tag}(\\s[^>]*)?>`, 'gi');
+      const closeRegex = new RegExp(`</${tag}>`, 'gi');
+      const openMatches = text.match(openRegex) || [];
+      const closeMatches = text.match(closeRegex) || [];
+
+      if (openMatches.length !== closeMatches.length) {
+        throw new Error(`Ошибка HTML-разметки: незакрытый тег <${tag}> (открыто: ${openMatches.length}, закрыто: ${closeMatches.length})`);
+      }
+    }
+
+    const allTags = text.match(/<\/?([a-z0-9]+)(\s[^>]*)?>/gi) || [];
+    for (const tagMatch of allTags) {
+      const tagNameMatch = tagMatch.match(/<\/?([a-z0-9]+)/i);
+      if (tagNameMatch) {
+        const tagName = tagNameMatch[1].toLowerCase();
+        if (!allowed.includes(tagName)) {
+          throw new Error(`Запрещенный тег: <${tagName}>. Разрешены только <a>, <code>, <i>, <strong>`);
+        }
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
 
     if (captchaInput.trim().toLowerCase() !== captchaText.toLowerCase()) {
       setCaptchaError(true);
       generateCaptcha();
       return;
     }
-
     setCaptchaError(false);
+
+    try {
+      validateHTML(messageText);
+    } catch (validationErr) {
+      setSubmitError(validationErr.message);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    formData.append("username", username.trim());
+    formData.append("text", messageText.trim());
+
+    if (email.trim()) formData.append("email", email.trim());
+    if (homepage.trim()) formData.append("home_page", homepage.trim());
+    if (replyTarget) formData.append("comment_id", replyTarget.id);
+    if (avatarFile) formData.append("avatar", avatarFile);
+    if (attachmentFile) formData.append("file", attachmentFile);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/comments`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        let parsedMessage = `Ошибка сервера (${res.status})`;
+
+        try {
+          const errJson = await res.json();
+          if (Array.isArray(errJson?.detail)) {
+            parsedMessage = errJson.detail.map(d => `${d.loc?.slice(-1)[0] || 'поле'}: ${d.msg}`).join('; ');
+          } else if (typeof errJson?.detail === 'string') {
+            parsedMessage = errJson.detail;
+          } else if (errJson?.message) {
+            parsedMessage = errJson.message;
+          } else if (errJson?.error) {
+            parsedMessage = errJson.error;
+          }
+        } catch {
+          const rawText = await res.text().catch(() => "");
+          if (rawText) {
+            parsedMessage = `${parsedMessage}: ${rawText.slice(0, 120)}`;
+          }
+        }
+
+        throw new Error(parsedMessage);
+      }
+
+      resetForm();
+
+    } catch (err) {
+      console.error("Ошибка отправки комментария:", err);
+
+      if (err.name === "TypeError" && err.message.toLowerCase().includes("fetch")) {
+        setSubmitError("Не удалось подключиться к серверу. Проверьте соединение или работу бэкенда.");
+      } else {
+        setSubmitError(err.message || "Не удалось отправить комментарий");
+      }
+
+      generateCaptcha();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="wrap">
-      <header className="header">
-        <div className="logo mono">{ }</div>
-        <div>
-          <h1>Комментарии</h1>
-          <p>{comments.length} сообщений</p>
-        </div>
-      </header>
-
       <div className="layout">
         <div className="feed-column">
           <div className="surface sort-bar">
@@ -412,12 +578,23 @@ function App() {
                 Дата {orderBy === '-created_at' ? '▾' : orderBy === 'created_at' ? '▴' : '⇅'}
               </button>
             </div>
-            <span className="sort-hint">по умолчанию — LIFO</span>
           </div>
 
           <div className="surface feed">
             {loading && <p style={{ padding: 16 }}>Загрузка сообщений...</p>}
-            {error && <p style={{ padding: 16, color: 'red' }}>{error}</p>}
+
+            {error && (
+              <div style={{ padding: 16, color: '#ef4444', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span>⚠️ {error}</span>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => p)}
+                  style={{ border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+                >
+                  Повторить
+                </button>
+              </div>
+            )}
 
             {!loading && !error && comments.length === 0 && (
               <p style={{ padding: 16, color: 'var(--muted)' }}>Комментариев пока нет</p>
@@ -487,6 +664,7 @@ function App() {
                     Выбрать изображение
                     <input
                       id="user-avatar"
+                      ref={avatarInputRef}
                       type="file"
                       accept="image/png,image/jpeg,image/gif"
                       onChange={handleAvatarChange}
@@ -498,15 +676,34 @@ function App() {
 
               <div className="field">
                 <label htmlFor="user-name">User Name *</label>
-                <input id="user-name" type="text" placeholder="latin_letters123" required />
+                <input
+                  id="user-name"
+                  type="text"
+                  placeholder="latin_letters123"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
               </div>
               <div className="field">
                 <label htmlFor="user-email">E-mail</label>
-                <input id="user-email" type="email" placeholder="mail@example.com" />
+                <input
+                  id="user-email"
+                  type="email"
+                  placeholder="mail@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="field full">
                 <label htmlFor="user-homepage">Home page</label>
-                <input id="user-homepage" type="url" placeholder="https://example.com" />
+                <input
+                  id="user-homepage"
+                  type="url"
+                  placeholder="https://example.com"
+                  value={homepage}
+                  onChange={(e) => setHomepage(e.target.value)}
+                />
               </div>
             </div>
 
@@ -548,6 +745,7 @@ function App() {
               onChange={(e) => setMessageText(e.target.value)}
               className="message"
               placeholder="Введите текст комментария…"
+              required
             />
 
             <div className="attachment-box" style={{ marginTop: 8, marginBottom: 12 }}>
@@ -693,7 +891,36 @@ function App() {
               </span>
             )}
 
-            <button type="submit" className="submit-btn">➤ Отправить комментарий</button>
+            {submitError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  borderRadius: 6,
+                  color: '#991B1B',
+                  fontSize: 13,
+                  marginTop: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8
+                }}
+              >
+                <span>⚠️ {submitError}</span>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontWeight: 'bold', fontSize: 16 }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <button type="submit" className="submit-btn" disabled={isSubmitting} style={{ marginTop: 12 }}>
+              {isSubmitting ? 'Отправка...' : '➤ Отправить комментарий'}
+            </button>
           </form>
         </div>
       </div>
