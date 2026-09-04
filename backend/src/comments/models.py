@@ -13,6 +13,7 @@ class Comments(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     text = models.TextField()
     email = models.EmailField(null=True, blank=True)
+    home_page = models.URLField(null=True, blank=True)
     file = models.FileField(
         upload_to="file/",
         blank=True,
