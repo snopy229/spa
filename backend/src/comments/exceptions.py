@@ -1,46 +1,4 @@
-from collections import defaultdict
-
-
-class DefaultHTTPException(Exception):
-    status_code = 500
-    error = "SERVER_ERROR"
-    message = "An unexpected error occurred"
-
-    def __init__(self, detail: object = None) -> None:
-        self.detail = detail or {
-            "error": self.error,
-            "message": self.message,
-        }
-        super().__init__(status_code=self.status_code, detail=self.detail)
-
-
-def exception_responses(*exceptions: type[DefaultHTTPException]) -> dict:
-    grouped: dict[int, list[type[DefaultHTTPException]]] = defaultdict(list)
-    for exc in exceptions:
-        grouped[exc.status_code].append(exc)
-
-    responses = {}
-    for status_code, excs in grouped.items():
-        responses[str(status_code)] = {
-            "content": {
-                "application/json": {
-                    "examples": {
-                        exc.error: {
-                            "summary": exc.error,
-                            "value": {
-                                "detail": {
-                                    "error": exc.error,
-                                    "message": exc.message,
-                                }
-                            },
-                        }
-                        for exc in excs
-                    }
-                }
-            },
-        }
-
-    return {"responses": responses}
+from src.default_exceptions import DefaultHTTPException
 
 
 class FileTooLargeException(DefaultHTTPException):
