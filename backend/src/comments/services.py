@@ -63,6 +63,7 @@ class CommentsService:
             avatar=avatar,
             file=file,
             comment_id=parent_id,
+            home_page=payload.home_page,
         )
         self._send_new_comment(comment)
 
