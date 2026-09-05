@@ -196,7 +196,6 @@ function InlineTextSnippet({ url, fileName }) {
 }
 
 function CommentRow({ comment, depth = 0, onReply, onImageClick }) {
-  const avatarUrl = getMediaUrl(comment.avatar);
   const fileUrl = getMediaUrl(comment.file);
   const isFileImage = isImageFile(comment.file);
   const isFileText = isTextFile(comment.file);
@@ -214,32 +213,6 @@ function CommentRow({ comment, depth = 0, onReply, onImageClick }) {
         <td style={{ paddingLeft: `${16 + depth * 24}px` }} className="col-user">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {depth > 0 && <span style={{ color: 'var(--muted)', fontSize: '13px' }}>↳</span>}
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={comment.username}
-                className="avatar"
-                style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div
-                className="avatar"
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  backgroundColor: '#F2A93B',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#fff'
-                }}
-              >
-                {comment.username.charAt(0).toUpperCase()}
-              </div>
-            )}
             <div>
               {homepageUrl ? (
                 <a
@@ -342,7 +315,6 @@ function App() {
   const [replyTarget, setReplyTarget] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
 
-  // Вкладка формы: "write" (написать) или "preview" (предпросмотр)
   const [activeTab, setActiveTab] = useState("write");
 
   const [username, setUsername] = useState("");
@@ -350,10 +322,6 @@ function App() {
   const [homepage, setHomepage] = useState("");
   const [messageText, setMessageText] = useState("");
   const textareaRef = useRef(null);
-
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [avatarFile, setAvatarFile] = useState(null);
-  const avatarInputRef = useRef(null);
 
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState(null);
@@ -376,18 +344,6 @@ function App() {
     if (orderBy === field) return ' ▴';
     if (orderBy === `-${field}`) return ' ▾';
     return ' ⇅';
-  };
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (avatarPreview) {
-      URL.revokeObjectURL(avatarPreview);
-    }
-
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleAttachmentChange = (e) => {
@@ -443,11 +399,6 @@ function App() {
     setActiveTab("write");
     if (replyTarget) setReplyTarget(null);
 
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    setAvatarFile(null);
-    setAvatarPreview(null);
-    if (avatarInputRef.current) avatarInputRef.current.value = "";
-
     removeAttachment();
     setCaptchaInput("");
     setCaptchaError(false);
@@ -457,10 +408,9 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
       if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
     };
-  }, [avatarPreview, attachmentPreview]);
+  }, [attachmentPreview]);
 
   const insertTag = (openTag, closeTag) => {
     const textarea = textareaRef.current;
@@ -635,7 +585,6 @@ function App() {
     if (email.trim()) formData.append("email", email.trim());
     if (homepage.trim()) formData.append("home_page", homepage.trim());
     if (replyTarget) formData.append("comment_id", replyTarget.id);
-    if (avatarFile) formData.append("avatar", avatarFile);
     if (attachmentFile) formData.append("file", attachmentFile);
 
     try {
@@ -801,39 +750,9 @@ function App() {
               </div>
             )}
 
-            {/* ВКЛАДКА 1: ФОРМА ВВОДА */}
             {activeTab === 'write' && (
               <>
                 <div className="form-grid">
-                  <div className="field full avatar-picker-field">
-                    <label>Аватар</label>
-                    <div className="avatar-picker">
-                      {avatarPreview ? (
-                        <img
-                          src={avatarPreview}
-                          alt="Предпросмотр аватара"
-                          className="avatar avatar-preview"
-                          style={{ objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div className="avatar avatar-preview" style={{ backgroundColor: '#F2A93B' }}>
-                          ?
-                        </div>
-                      )}
-                      <label htmlFor="user-avatar" className="avatar-upload-btn">
-                        Выбрать изображение
-                        <input
-                          id="user-avatar"
-                          ref={avatarInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/gif"
-                          onChange={handleAvatarChange}
-                          hidden
-                        />
-                      </label>
-                    </div>
-                  </div>
-
                   <div className="field">
                     <label htmlFor="user-name">User Name *</label>
                     <input
@@ -1027,7 +946,6 @@ function App() {
               </>
             )}
 
-            {/* ВКЛАДКА 2: ПРЕДПРОСМОТР СООБЩЕНИЯ */}
             {activeTab === 'preview' && (
               <div
                 style={{
@@ -1039,62 +957,34 @@ function App() {
                   minHeight: '220px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Аватар"
-                      style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: '50%',
-                        backgroundColor: '#F2A93B',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        fontSize: '13px'
-                      }}
-                    >
-                      {(username.trim() || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    {previewHomepageUrl ? (
+                      <a
+                        href={previewHomepageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontWeight: 600, color: 'var(--ink)', textDecoration: 'underline' }}
+                      >
+                        {username.trim() || "Имя пользователя"} ↗
+                      </a>
+                    ) : (
+                      <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
+                        {username.trim() || "Имя пользователя"}
+                      </span>
+                    )}
 
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      {previewHomepageUrl ? (
-                        <a
-                          href={previewHomepageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ fontWeight: 600, color: 'var(--ink)', textDecoration: 'underline' }}
-                        >
-                          {username.trim() || "Имя пользователя"} ↗
-                        </a>
-                      ) : (
-                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
-                          {username.trim() || "Имя пользователя"}
-                        </span>
-                      )}
-
-                      {email.trim() && (
-                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                          ({email.trim()})
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '11px', color: 'var(--faint)' }}>
-                      Только что (предпросмотр)
-                    </span>
+                    {email.trim() && (
+                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                        ({email.trim()})
+                      </span>
+                    )}
                   </div>
+                  <span style={{ fontSize: '11px', color: 'var(--faint)' }}>
+                    Только что (предпросмотр)
+                  </span>
                 </div>
 
-                {/* Рендер HTML разметки */}
                 <div
                   className="comment-text"
                   style={{
@@ -1109,7 +999,6 @@ function App() {
                   }}
                 />
 
-                {/* Превью прикрепленного файла */}
                 {attachmentFile && (
                   <div style={{ marginTop: '10px' }}>
                     {attachmentPreview ? (

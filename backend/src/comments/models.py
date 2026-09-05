@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 class Comments(models.Model):
     username = models.CharField(max_length=10)
-    avatar = models.ImageField(upload_to="avatar/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     text = models.TextField()
     email = models.EmailField()
@@ -26,7 +25,7 @@ class Comments(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
-        if self.file or self.avatar:
+        if self.file:
             try:
                 with Image.open(self.file.path) as img:
                     if img.width > 320 or img.height > 240:

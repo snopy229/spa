@@ -37,6 +37,5 @@ def post_comment(
     request,
     payload: Form[CommentCreateIn],
     file: File[UploadedFile] = None,
-    avatar: File[UploadedFile] = None,
 ):
-    return comments_service.create_comment(payload, file, avatar)
+    return comments_service.create_comment(payload, file)

@@ -1,12 +1,13 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from ninja.errors import HttpError
+
 from src.comments.models import Comments
 from src.comments.schemas import CommentTreeOut
 
 
 class CommentsService:
-    def _validate_files(self, file, avatar):
+    def _validate_files(self, file):
         if file and file.content_type not in [
             "text/plain",
             "image/jpeg",
@@ -16,13 +17,6 @@ class CommentsService:
             raise HttpError(400, "Разрешены только файлы формата TXT, JPG, GIF и PNG.")
         if file and file.content_type == "text/plain" and file.size > 100 * 1024:
             raise HttpError(400, "Размер файла TXT не должен превышать 100 KB.")
-
-        if avatar and avatar.content_type not in [
-            "image/jpeg",
-            "image/gif",
-            "image/png",
-        ]:
-            raise HttpError(400, "Разрешены только файлы формата JPG, GIF и PNG.")
 
     def _send_new_comment(self, comment):
 
@@ -47,8 +41,8 @@ class CommentsService:
         )
         return comments
 
-    def create_comment(self, payload, file, avatar):
-        self._validate_files(file, avatar)
+    def create_comment(self, payload, file):
+        self._validate_files(file)
 
         parent_id = (
             payload.comment_id
@@ -60,7 +54,6 @@ class CommentsService:
             username=payload.username,
             email=payload.email,
             text=payload.text,
-            avatar=avatar,
             file=file,
             comment_id=parent_id,
             home_page=payload.home_page,

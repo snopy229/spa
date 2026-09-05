@@ -54,7 +54,6 @@ class CommentCreateIn(Schema):
 class CommentTreeOut(Schema):
     id: int
     username: str
-    avatar: str | None = None
     file: str | None = None
     text: str
     created_at: datetime
