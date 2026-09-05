@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import './App.css';
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_BACKEND_URL;
+console.log('API_BASE:', API_BASE);
 
 async function fetchComments(orderBy = "-created_at", page = 1) {
   const params = new URLSearchParams({ order_by: orderBy, page });
@@ -341,6 +342,9 @@ function App() {
   const [replyTarget, setReplyTarget] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
 
+  // Вкладка формы: "write" (написать) или "preview" (предпросмотр)
+  const [activeTab, setActiveTab] = useState("write");
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [homepage, setHomepage] = useState("");
@@ -436,6 +440,7 @@ function App() {
     setUsername("");
     setEmail("");
     setHomepage("");
+    setActiveTab("write");
     if (replyTarget) setReplyTarget(null);
 
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
@@ -680,6 +685,12 @@ function App() {
     }
   };
 
+  const previewHomepageUrl = homepage.trim()
+    ? homepage.trim().startsWith('http://') || homepage.trim().startsWith('https://')
+      ? homepage.trim()
+      : `https://${homepage.trim()}`
+    : null;
+
   return (
     <div className="wrap">
       <div className="layout">
@@ -765,8 +776,21 @@ function App() {
         </div>
 
         <div className="surface composer-column">
-          <div className="composer-tabs" style={{ justifyContent: 'center' }}>
-            <button className="tab active" style={{ margin: '0 auto' }}>✎ Написать</button>
+          <div className="composer-tabs" style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+            <button
+              type="button"
+              className={`tab ${activeTab === 'write' ? 'active' : ''}`}
+              onClick={() => setActiveTab('write')}
+            >
+              ✎ Написать
+            </button>
+            <button
+              type="button"
+              className={`tab ${activeTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preview')}
+            >
+              👁 Предпросмотр
+            </button>
           </div>
 
           <form className="composer-body" onSubmit={handleSubmit}>
@@ -777,226 +801,343 @@ function App() {
               </div>
             )}
 
-            <div className="form-grid">
-              <div className="field full avatar-picker-field">
-                <label>Аватар</label>
-                <div className="avatar-picker">
+            {/* ВКЛАДКА 1: ФОРМА ВВОДА */}
+            {activeTab === 'write' && (
+              <>
+                <div className="form-grid">
+                  <div className="field full avatar-picker-field">
+                    <label>Аватар</label>
+                    <div className="avatar-picker">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Предпросмотр аватара"
+                          className="avatar avatar-preview"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="avatar avatar-preview" style={{ backgroundColor: '#F2A93B' }}>
+                          ?
+                        </div>
+                      )}
+                      <label htmlFor="user-avatar" className="avatar-upload-btn">
+                        Выбрать изображение
+                        <input
+                          id="user-avatar"
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/gif"
+                          onChange={handleAvatarChange}
+                          hidden
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="user-name">User Name *</label>
+                    <input
+                      id="user-name"
+                      type="text"
+                      placeholder="latin_letters123"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="user-email">E-mail *</label>
+                    <input
+                      id="user-email"
+                      type="email"
+                      placeholder="mail@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="field full">
+                    <label htmlFor="user-homepage">Home page</label>
+                    <input
+                      id="user-homepage"
+                      type="url"
+                      placeholder="https://example.com"
+                      value={homepage}
+                      onChange={(e) => setHomepage(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="toolbar">
+                  <button
+                    type="button"
+                    className="tool-btn"
+                    onClick={() => insertTag('<i>', '</i>')}
+                  >
+                    &lt;i&gt;
+                  </button>
+                  <button
+                    type="button"
+                    className="tool-btn"
+                    onClick={() => insertTag('<strong>', '</strong>')}
+                  >
+                    &lt;strong&gt;
+                  </button>
+                  <button
+                    type="button"
+                    className="tool-btn mono"
+                    onClick={() => insertTag('<code>', '</code>')}
+                  >
+                    &lt;code&gt;
+                  </button>
+                  <button
+                    type="button"
+                    className="tool-btn"
+                    onClick={() => insertTag('<a href="" title="">', '</a>')}
+                  >
+                    &lt;a&gt;
+                  </button>
+                  <span className="allowed-tags">&lt;a&gt; &lt;code&gt; &lt;i&gt; &lt;strong&gt;</span>
+                </div>
+
+                <textarea
+                  ref={textareaRef}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  className="message"
+                  placeholder="Введите текст комментария…"
+                  required
+                />
+
+                <div className="attachment-box" style={{ marginTop: 8, marginBottom: 12 }}>
+                  <input
+                    id="file-attachment"
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.gif,.txt"
+                    onChange={handleAttachmentChange}
+                    hidden
+                  />
+
+                  {!attachmentFile ? (
+                    <label htmlFor="file-attachment" className="dropzone" style={{ cursor: 'pointer', display: 'block' }}>
+                      📎 Перетащите файл или нажмите для выбора
+                      <span className="formats">JPG · PNG · GIF · TXT</span>
+                    </label>
+                  ) : (
+                    <div
+                      className="attachment-preview-card"
+                      style={{
+                        backgroundColor: '#F6F7F4',
+                        borderRadius: 8,
+                        border: '1px solid #D6D9D1',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '8px 12px'
+                        }}
+                      >
+                        {attachmentPreview ? (
+                          <img
+                            src={attachmentPreview}
+                            alt="Превью"
+                            style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4 }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 44,
+                              height: 44,
+                              backgroundColor: '#EAECE7',
+                              borderRadius: 4,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #D6D9D1'
+                            }}
+                          >
+                            <span style={{ fontSize: 18, lineHeight: 1 }}>📄</span>
+                            <span style={{ fontSize: 8, fontWeight: 700, color: '#767C82', marginTop: 2 }}>TXT</span>
+                          </div>
+                        )}
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#15181D' }}>
+                            {attachmentFile.name}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#767C82' }}>
+                            {(attachmentFile.size / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={removeAttachment}
+                          title="Удалить файл"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 18,
+                            color: '#767C82',
+                            padding: '4px 8px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {txtFileSnippet && (
+                        <div
+                          style={{
+                            borderTop: '1px dashed #D6D9D1',
+                            padding: '8px 12px',
+                            backgroundColor: '#FFFFFF'
+                          }}
+                        >
+                          <pre
+                            style={{
+                              margin: 0,
+                              fontSize: 12,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              color: '#374151',
+                              maxHeight: 120,
+                              overflowY: 'auto',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-all',
+                              background: '#F9FAFB',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: '1px solid #E5E7EB'
+                            }}
+                          >
+                            {txtFileSnippet}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ВКЛАДКА 2: ПРЕДПРОСМОТР СООБЩЕНИЯ */}
+            {activeTab === 'preview' && (
+              <div
+                style={{
+                  background: '#F9FAFB',
+                  border: '1px solid var(--line-strong)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '16px',
+                  minHeight: '220px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                   {avatarPreview ? (
                     <img
                       src={avatarPreview}
-                      alt="Предпросмотр аватара"
-                      className="avatar avatar-preview"
-                      style={{ objectFit: 'cover' }}
+                      alt="Аватар"
+                      style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
                     />
                   ) : (
-                    <div className="avatar avatar-preview" style={{ backgroundColor: '#F2A93B' }}>
-                      ?
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: '50%',
+                        backgroundColor: '#F2A93B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        color: '#fff',
+                        fontSize: '13px'
+                      }}
+                    >
+                      {(username.trim() || '?').charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <label htmlFor="user-avatar" className="avatar-upload-btn">
-                    Выбрать изображение
-                    <input
-                      id="user-avatar"
-                      ref={avatarInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif"
-                      onChange={handleAvatarChange}
-                      hidden
-                    />
-                  </label>
+
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {previewHomepageUrl ? (
+                        <a
+                          href={previewHomepageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ fontWeight: 600, color: 'var(--ink)', textDecoration: 'underline' }}
+                        >
+                          {username.trim() || "Имя пользователя"} ↗
+                        </a>
+                      ) : (
+                        <span style={{ fontWeight: 600, color: 'var(--ink)' }}>
+                          {username.trim() || "Имя пользователя"}
+                        </span>
+                      )}
+
+                      {email.trim() && (
+                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                          ({email.trim()})
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--faint)' }}>
+                      Только что (предпросмотр)
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="field">
-                <label htmlFor="user-name">User Name *</label>
-                <input
-                  id="user-name"
-                  type="text"
-                  placeholder="latin_letters123"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="user-email">E-mail *</label>
-                <input
-                  id="user-email"
-                  type="email"
-                  placeholder="mail@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="field full">
-                <label htmlFor="user-homepage">Home page</label>
-                <input
-                  id="user-homepage"
-                  type="url"
-                  placeholder="https://example.com"
-                  value={homepage}
-                  onChange={(e) => setHomepage(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="toolbar">
-              <button
-                type="button"
-                className="tool-btn"
-                onClick={() => insertTag('<i>', '</i>')}
-              >
-                &lt;i&gt;
-              </button>
-              <button
-                type="button"
-                className="tool-btn"
-                onClick={() => insertTag('<strong>', '</strong>')}
-              >
-                &lt;strong&gt;
-              </button>
-              <button
-                type="button"
-                className="tool-btn mono"
-                onClick={() => insertTag('<code>', '</code>')}
-              >
-                &lt;code&gt;
-              </button>
-              <button
-                type="button"
-                className="tool-btn"
-                onClick={() => insertTag('<a href="" title="">', '</a>')}
-              >
-                &lt;a&gt;
-              </button>
-              <span className="allowed-tags">&lt;a&gt; &lt;code&gt; &lt;i&gt; &lt;strong&gt;</span>
-            </div>
-
-            <textarea
-              ref={textareaRef}
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              className="message"
-              placeholder="Введите текст комментария…"
-              required
-            />
-
-            <div className="attachment-box" style={{ marginTop: 8, marginBottom: 12 }}>
-              <input
-                id="file-attachment"
-                ref={fileInputRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,.gif,.txt"
-                onChange={handleAttachmentChange}
-                hidden
-              />
-
-              {!attachmentFile ? (
-                <label htmlFor="file-attachment" className="dropzone" style={{ cursor: 'pointer', display: 'block' }}>
-                  📎 Перетащите файл или нажмите для выбора
-                  <span className="formats">JPG · PNG · GIF · TXT</span>
-                </label>
-              ) : (
+                {/* Рендер HTML разметки */}
                 <div
-                  className="attachment-preview-card"
+                  className="comment-text"
                   style={{
-                    backgroundColor: '#F6F7F4',
-                    borderRadius: 8,
-                    border: '1px solid #D6D9D1',
-                    overflow: 'hidden'
+                    padding: '10px',
+                    background: '#fff',
+                    borderRadius: '6px',
+                    border: '1px solid var(--line)',
+                    minHeight: '60px'
                   }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '8px 12px'
-                    }}
-                  >
+                  dangerouslySetInnerHTML={{
+                    __html: messageText.trim() || '<span style="color: var(--faint);">Текст комментария отсутствует...</span>'
+                  }}
+                />
+
+                {/* Превью прикрепленного файла */}
+                {attachmentFile && (
+                  <div style={{ marginTop: '10px' }}>
                     {attachmentPreview ? (
                       <img
                         src={attachmentPreview}
-                        alt="Превью"
-                        style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4 }}
+                        alt="Вложение"
+                        style={{ maxHeight: '80px', borderRadius: '4px', border: '1px solid var(--line)' }}
                       />
                     ) : (
                       <div
                         style={{
-                          width: 44,
-                          height: 44,
-                          backgroundColor: '#EAECE7',
-                          borderRadius: 4,
-                          display: 'flex',
-                          flexDirection: 'column',
+                          background: '#fff',
+                          border: '1px solid var(--line)',
+                          borderRadius: '4px',
+                          padding: '6px 10px',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid #D6D9D1'
+                          gap: '6px',
+                          fontSize: '12px'
                         }}
                       >
-                        <span style={{ fontSize: 18, lineHeight: 1 }}>📄</span>
-                        <span style={{ fontSize: 8, fontWeight: 700, color: '#767C82', marginTop: 2 }}>TXT</span>
+                        📄 {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(1)} KB)
                       </div>
                     )}
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#15181D' }}>
-                        {attachmentFile.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#767C82' }}>
-                        {(attachmentFile.size / 1024).toFixed(1)} KB
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={removeAttachment}
-                      title="Удалить файл"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 18,
-                        color: '#767C82',
-                        padding: '4px 8px'
-                      }}
-                    >
-                      ✕
-                    </button>
                   </div>
-
-                  {txtFileSnippet && (
-                    <div
-                      style={{
-                        borderTop: '1px dashed #D6D9D1',
-                        padding: '8px 12px',
-                        backgroundColor: '#FFFFFF'
-                      }}
-                    >
-                      <pre
-                        style={{
-                          margin: 0,
-                          fontSize: 12,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: '#374151',
-                          maxHeight: 120,
-                          overflowY: 'auto',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-all',
-                          background: '#F9FAFB',
-                          padding: '8px',
-                          borderRadius: '4px',
-                          border: '1px solid #E5E7EB'
-                        }}
-                      >
-                        {txtFileSnippet}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <div className="captcha-row">
               <canvas

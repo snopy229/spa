@@ -7,8 +7,9 @@ RUN apk add --no-cache \
     libpng-dev \
     make
 
-COPY . .
-
+COPY package.json package-lock.json ./
 RUN npm install
+
+COPY . .
 
 EXPOSE  5173
