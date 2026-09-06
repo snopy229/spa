@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import './App.css';
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL;
-console.log('API_BASE:', API_BASE);
+const WS_BASE = import.meta.env.VITE_WS_URL;
 
 async function fetchComments(orderBy = "-created_at", page = 1) {
   const params = new URLSearchParams({ order_by: orderBy, page });
@@ -507,7 +507,7 @@ function App() {
   useEffect(() => {
     let ws;
     try {
-      ws = new WebSocket('ws://localhost:8080/ws/comments');
+      ws = new WebSocket(`${WS_BASE}/ws/comments`);
 
       ws.onmessage = (event) => {
         try {
