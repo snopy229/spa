@@ -21,7 +21,7 @@ env = Env(DEBUG=(bool, False))
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(os.path.join(BASE_DIR, "src"))
 
-Env.read_env(os.path.join(BASE_DIR, ".env.example"))
+Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 
 # Quick-start development settings - unsuitable for production
