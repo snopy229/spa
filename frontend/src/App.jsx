@@ -817,7 +817,6 @@ function App() {
                   >
                     &lt;a&gt;
                   </button>
-                  <span className="allowed-tags">&lt;a&gt; &lt;code&gt; &lt;i&gt; &lt;strong&gt;</span>
                 </div>
 
                 <textarea
