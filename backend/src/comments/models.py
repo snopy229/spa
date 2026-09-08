@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class Comments(models.Model):
-    username = models.CharField(max_length=10)
+    username = models.CharField(max_length=25)
     created_at = models.DateTimeField(auto_now_add=True)
     text = models.TextField()
     email = models.EmailField()
