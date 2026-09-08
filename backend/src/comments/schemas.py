@@ -7,7 +7,7 @@ from defusedxml import ElementTree
 from defusedxml.ElementTree import ParseError
 from django.utils.text import normalize_newlines
 from ninja import Schema
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr, Field, field_validator
 
 from src.comments.exceptions import (
     HTMLTagsNotClosedException,
@@ -24,7 +24,7 @@ ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
 
 
 class CommentCreateIn(Schema):
-    username: str
+    username: str = Field(max_length=25)
     text: str
     home_page: str | None = None
     comment_id: int | None = None
