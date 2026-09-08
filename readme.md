@@ -18,7 +18,6 @@
 
 **Инфраструктура**
 - Docker / Docker Compose (backend, frontend, db, redis, nginx)
-- Nginx как reverse proxy перед frontend и backend
 
 ## Функциональность
 
