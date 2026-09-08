@@ -759,6 +759,7 @@ function App() {
                       id="user-name"
                       type="text"
                       placeholder="latin_letters123"
+                      maxLength={25}
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       required
