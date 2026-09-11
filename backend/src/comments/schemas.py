@@ -58,6 +58,6 @@ class CommentTreeOut(Schema):
     text: str
     created_at: datetime
     email: EmailStr
-    home_page: str | None = None
+    home_page: HttpUrl | None = None
     comment_id: int | None = None
     replies: list["CommentTreeOut"] = []  # noqa: RUF012
